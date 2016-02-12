@@ -38,6 +38,7 @@
 #include "algorithm/yescrypt.h"
 #include "algorithm/credits.h"
 #include "algorithm/blake256.h"
+#include "algorithm/blakecoin.h"
 
 #include "compat.h"
 
@@ -1035,9 +1036,9 @@ static algorithm_settings_t algos[] = {
   { "whirlcoin", ALGO_WHIRL, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 3, 8 * 16 * 4194304, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, whirlcoin_regenhash, queue_whirlcoin_kernel, sha256, NULL },
   { "whirlpoolx", ALGO_WHIRLPOOLX, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x0000FFFFUL, 0, 0, 0, whirlpoolx_regenhash, queue_whirlpoolx_kernel, gen_hash, NULL },
 
-  { "blake256r8",  ALGO_BLAKECOIN, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x000000ffUL, 0, 128, 0, blake_regenhash, queue_blake_kernel, sha256,   NULL },
-  { "blake256r14", ALGO_BLAKE,     "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x00000000UL, 0, 128, 0, blake_regenhash, queue_blake_kernel, gen_hash, NULL },
-  { "vanilla",     ALGO_VANILLA,   "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x000000ffUL, 0, 128, 0, blake_regenhash, queue_blake_kernel, gen_hash, NULL },
+  { "blake256r8",  ALGO_BLAKECOIN, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x000000ffUL, 0, 128, 0, blakecoin_regenhash, queue_blake_kernel, sha256,   NULL },
+  { "blake256r14", ALGO_BLAKE,     "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x00000000UL, 0, 128, 0, blake256_regenhash, queue_blake_kernel, gen_hash, NULL },
+  { "vanilla",     ALGO_VANILLA,   "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x000000ffUL, 0, 128, 0, blakecoin_regenhash, queue_blake_kernel, gen_hash, NULL },
 
   // Terminator (do not remove)
   { NULL, ALGO_UNK, "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL }

@@ -37,7 +37,7 @@
 #include <stdint.h>
 
 #include "sph/sph_blake.h"
-#include "algorithm/blake256.h"
+#include "algorithm/blakecoin.h"
 
 /*
 * Encode a length len/4 vector of (uint32_t) into a length len vector of
@@ -54,26 +54,26 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 
 static const uint32_t diff1targ_blake256 = 0x000000ff;
 
-inline void blake256hash(void *state, const void *input)
+inline void blakecoinhash(void *state, const void *input)
 {
-  sph_blake256_context ctx_blake;
+  sph_blake256_context     ctx_blake;
   sph_blake256_init(&ctx_blake);
-  sph_blake256(&ctx_blake, input, 80);
-  sph_blake256_close(&ctx_blake, state);
+  sph_blake256r8(&ctx_blake, input, 80);
+  sph_blake256r8_close(&ctx_blake, state);
 }
 
 static const uint32_t diff1targ = 0x0000ffff;
 
 
 /* Used externally as confirmation of correct OCL code */
-int blake256_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t nonce)
+int blakecoin_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t nonce)
 {
 	uint32_t tmp_hash7, Htarg = le32toh(((const uint32_t *)ptarget)[7]);
 	uint32_t data[20], ohash[8];
 
 	be32enc_vect(data, (const uint32_t *)pdata, 19);
 	data[19] = htobe32(nonce);
-	blake256hash(ohash, data);
+	blakecoinhash(ohash, data);
 	tmp_hash7 = be32toh(ohash[7]);
 
 	applog(LOG_DEBUG, "htarget %08lx diff1 %08lx hash %08lx",
@@ -87,7 +87,7 @@ int blake256_test(unsigned char *pdata, const unsigned char *ptarget, uint32_t n
 	return 1;
 }
 
-void blake256_regenhash(struct work *work)
+void blakecoin_regenhash(struct work *work)
 {
         uint32_t data[20];
         uint32_t *nonce = (uint32_t *)(work->data + 76);
@@ -95,10 +95,10 @@ void blake256_regenhash(struct work *work)
 
         be32enc_vect(data, (const uint32_t *)work->data, 19);
         data[19] = htobe32(*nonce);
-        blake256hash(ohash, data);
+        blakecoinhash(ohash, data);
 }
 
-bool scanhash_blake256(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
+bool scanhash_blakecoin(struct thr_info *thr, const unsigned char __maybe_unused *pmidstate,
 		     unsigned char *pdata, unsigned char __maybe_unused *phash1,
 		     unsigned char __maybe_unused *phash, const unsigned char *ptarget,
 		     uint32_t max_nonce, uint32_t *last_nonce, uint32_t n)
@@ -116,7 +116,7 @@ bool scanhash_blake256(struct thr_info *thr, const unsigned char __maybe_unused 
 
 		*nonce = ++n;
 		data[19] = (n);
-		blake256hash(ostate, data);
+		blakecoinhash(ostate, data);
 		tmp_hash7 = (ostate[7]);
 
 		applog(LOG_INFO, "data7 %08lx",

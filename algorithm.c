@@ -1007,6 +1007,108 @@ static cl_int queue_decred_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_u
   return status;
 }
 
+static cl_int queue_quarkcoin_kernel(struct __clState *clState, struct _dev_blk_ctx *blk, __maybe_unused cl_uint threads)
+{
+  cl_kernel *kernel = &clState->kernel;
+  unsigned int num = 0;
+  cl_ulong le_target;
+  cl_int status = 0;
+  le_target = *(cl_ulong *)(blk->work->device_target + 24);
+  flip80(clState->cldata, blk->work->data);
+  status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL,NULL);
+  // search
+  CL_SET_ARG(clState->CLbuffer0);
+  CL_SET_ARG(clState->padbuffer8);
+  num = 0;
+  kernel = clState->extra_kernels;
+
+  for(int i = 0; i < 3; ++i, kernel++)
+  {
+    CL_SET_ARG(clState->padbuffer8);
+    CL_SET_ARG(clState->BranchBuffer[i << 1]);
+    CL_SET_ARG(clState->BranchBuffer[(i << 1) + 1]);
+    CL_SET_ARG(clState->GlobalThreadCount);
+    num = 0;
+
+    CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+    CL_SET_ARG(clState->BranchBuffer[i << 1]);
+
+    if(i == 2)
+    {
+      CL_SET_ARG(clState->outputBuffer);
+      CL_SET_ARG(le_target);
+    }
+
+    num = 0;
+
+    CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+    CL_SET_ARG(clState->BranchBuffer[(i << 1) + 1]);
+
+    if(i < 2)
+    {
+      CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
+    }
+    else
+    {
+      CL_SET_ARG(clState->outputBuffer);
+      CL_SET_ARG(le_target);
+    }
+    num = 0;
+  }
+  /*
+  // search1
+  CL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch1Nonces);
+  CL_SET_ARG(clState->Branch2Nonces);
+  CL_SET_ARG(clState->GlobalThreadCount);
+  num = 0;
+  // search2
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch1Nonces);
+  num = 0;
+  // search3
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch2Nonces);
+  num = 0;
+  // search4
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
+  // search5
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch3Nonces);
+  CL_SET_ARG(clState->Branch4Nonces);
+  CL_SET_ARG(clState->GlobalThreadCount);
+  num = 0;
+  // search6
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch3Nonces);
+  num = 0;
+  //search7
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch4Nonces);
+  num = 0;
+  // search8
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
+  // search9
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch5Nonces);
+  CL_SET_ARG(clState->Branch6Nonces);
+  CL_SET_ARG(clState->GlobalThreadCount);
+  num = 0;
+  // search10
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch5Nonces);
+  CL_SET_ARG(clState->outputBuffer);
+  CL_SET_ARG(le_target);
+  num = 0;
+  // search11
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->Branch6Nonces);
+  CL_SET_ARG(clState->outputBuffer);
+  CL_SET_ARG(le_target);
+  */
+  return status;
+}
+
 static algorithm_settings_t algos[] = {
   // kernels starting from this will have difficulty calculated by using litecoin algorithm
 #define A_SCRYPT(a) \
@@ -1051,13 +1153,10 @@ static algorithm_settings_t algos[] = {
 #undef A_YESCRYPT_MULTI
 
   // kernels starting from this will have difficulty calculated by using quarkcoin algorithm
-#define A_QUARK(a, b) \
-  { a, ALGO_QUARK, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, b, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options }
-  A_QUARK("quarkcoin", quarkcoin_regenhash),
-  A_QUARK("qubitcoin", qubitcoin_regenhash),
-  A_QUARK("animecoin", animecoin_regenhash),
-  A_QUARK("sifcoin", sifcoin_regenhash),
-#undef A_QUARK
+  { "quarkcoin", ALGO_QUARK, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 11, 8 * 16 * 4194304, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, quarkcoin_regenhash, NULL, NULL, queue_quarkcoin_kernel, gen_hash, append_x11_compiler_options },
+  { "qubitcoin", ALGO_QUBIT, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, qubitcoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
+  { "animecoin", ALGO_ANIME, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, animecoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
+  { "sifcoin", ALGO_SIF, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, sifcoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
 
   // kernels starting from this will have difficulty calculated by using bitcoin algorithm
 #define A_DARK(a, b) \

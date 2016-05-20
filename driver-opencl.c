@@ -1425,19 +1425,84 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
   if (clState->goffset)
     p_global_work_offset = (size_t *)&work->blk.nonce;
 
-  status = clEnqueueNDRangeKernel(clState->commandQueue, clState->kernel, 1, p_global_work_offset,
-    globalThreads, localThreads, 0, NULL, NULL);
-  if (unlikely(status != CL_SUCCESS)) {
-    applog(LOG_ERR, "Error %d: Enqueueing kernel onto command queue. (clEnqueueNDRangeKernel)", status);
-    return -1;
-  }
+  if (gpu->algorithm.type == ALGO_QUARK) {
+    cl_event WaitEvents[2];
+    cl_uint zero = 0;
 
-  for (i = 0; i < clState->n_extra_kernels; i++) {
-    status = clEnqueueNDRangeKernel(clState->commandQueue, clState->extra_kernels[i], 1, p_global_work_offset,
-      globalThreads, localThreads, 0, NULL, NULL);
+    for (int i = 0; i < 6; ++i) {
+      status = clEnqueueWriteBuffer(clState->commandQueue, clState->BranchBuffer[i], CL_TRUE, sizeof(cl_uint) * clState->GlobalThreadCount, sizeof(cl_uint), &zero, 0, NULL, NULL);
+      if (status != CL_SUCCESS) {
+        applog(LOG_ERR, "Error %d while attempting to nuke BranchBuffer %d.", status, i);
+        return -1;
+      }
+    }
+
+    for (int i = 0, x = 0; i < 9; ++i, ++x) {
+      size_t BranchCount0, BranchCount1;
+      status = clEnqueueNDRangeKernel(clState->commandQueue, ((i) ? clState->extra_kernels[i] : clState->kernel), 1, p_global_work_offset, globalThreads, localThreads, 0,  NULL, WaitEvents);
+      if (status != CL_SUCCESS) {
+        if (i) applog(LOG_ERR, "Error %d while attempting to enqueue kernel with index %d.", status, i);
+        else applog(LOG_ERR, "Error %d while attempting to enqueue initial kernel.", status);
+        return -1;
+      }
+
+      clWaitForEvents(1, WaitEvents);
+      clReleaseEvent(WaitEvents[0]);
+
+      if (i) ++i;
+
+      status = clEnqueueNDRangeKernel(clState->commandQueue, clState->extra_kernels[i], 1, p_global_work_offset, globalThreads, localThreads, 0,  NULL, WaitEvents);
+      if (status != CL_SUCCESS) {
+        applog(LOG_ERR, "Error %d while attempting to enqueue kernel with index %d.", status, i);
+        return -1;
+      }
+
+      clWaitForEvents(1, WaitEvents);
+      clReleaseEvent(WaitEvents[0]);
+
+      // Do a blocking read for the found counter in both buffers
+      // so we know how many threads to dispatch to each branch
+      status = clEnqueueReadBuffer(clState->commandQueue, clState->BranchBuffer[x << 1], CL_TRUE, sizeof(cl_uint) * globalThreads[0], sizeof(cl_uint), &BranchCount0, 0, NULL, NULL);
+      if (status != CL_SUCCESS) {
+        applog(LOG_ERR, "Error %d while attempting to read intermediate data from GPU.", status, i);
+        return -1;
+      }
+
+      BranchCount1 = globalThreads[0] - BranchCount0;
+      ++i;
+
+      status = clEnqueueNDRangeKernel(clState->commandQueue, clState->extra_kernels[i], 1, p_global_work_offset, &BranchCount0, localThreads, 0,  NULL, WaitEvents);
+      if (status != CL_SUCCESS) {
+        applog(LOG_ERR, "Error %d while attempting to enqueue kernel with index %d.", status, i);
+        return -1;
+      }
+
+      ++i;
+
+      status = clEnqueueNDRangeKernel(clState->commandQueue, clState->extra_kernels[i], 1, p_global_work_offset, &BranchCount1, localThreads, 0,  NULL, WaitEvents + 1);
+      if (status != CL_SUCCESS) {
+        applog(LOG_ERR, "Error %d while attempting to enqueue kernel with index %d.", status, i);
+        return -1;
+      }
+
+      clWaitForEvents(2, WaitEvents);
+      clReleaseEvent(WaitEvents[0]);
+      clReleaseEvent(WaitEvents[1]);
+    }
+  }
+  else {
+    status = clEnqueueNDRangeKernel(clState->commandQueue, clState->kernel, 1, p_global_work_offset, globalThreads, localThreads, 0, NULL, NULL);
     if (unlikely(status != CL_SUCCESS)) {
       applog(LOG_ERR, "Error %d: Enqueueing kernel onto command queue. (clEnqueueNDRangeKernel)", status);
       return -1;
+    }
+
+    for (i = 0; i < clState->n_extra_kernels; i++) {
+      status = clEnqueueNDRangeKernel(clState->commandQueue, clState->extra_kernels[i], 1, p_global_work_offset, globalThreads, localThreads, 0, NULL, NULL);
+      if (unlikely(status != CL_SUCCESS)) {
+        applog(LOG_ERR, "Error %d: Enqueueing kernel onto command queue. (clEnqueueNDRangeKernel)", status);
+        return -1;
+      }
     }
   }
 

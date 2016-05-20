@@ -13,6 +13,8 @@ typedef struct __clState {
   cl_mem outputBuffer;
   cl_mem CLbuffer0;
   cl_mem MidstateBuf;
+  cl_mem BranchBuffer[6];
+  size_t GlobalThreadCount;
   cl_mem padbuffer8;
   cl_mem buffer1;
   cl_mem buffer2;

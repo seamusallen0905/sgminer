@@ -180,6 +180,35 @@ static cl_int create_opencl_command_queue(cl_command_queue *command_queue, cl_co
   return status;
 }
 
+// Copied from set_threads_hashes() in driver-opencl.c
+static size_t CalcGlobalThreads(unsigned int compute_shaders, unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *xintensity, __maybe_unused int *rawintensity, algorithm_t *algorithm)
+{
+  size_t threads = 0;
+  while (threads < minthreads) {
+
+    if (*rawintensity > 0) {
+      threads = *rawintensity;
+    }
+    else if (*xintensity > 0) {
+      threads = compute_shaders * ((algorithm->xintensity_shift)?(1 << (algorithm->xintensity_shift + *xintensity)):*xintensity);
+    }
+    else {
+      threads = 1 << (algorithm->intensity_shift + *intensity);
+    }
+
+    if (threads < minthreads) {
+      if (likely(*intensity < MAX_INTENSITY)) {
+        (*intensity)++;
+      }
+      else {
+        threads = minthreads;
+      }
+    }
+  }
+
+  return(threads);
+}
+
 _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *algorithm)
 {
   cl_int status = 0;
@@ -837,7 +866,19 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *alg
       applog(LOG_WARNING, "Your settings come to %lu", (unsigned long)bufsize);
     }
 
-    if (algorithm->type == ALGO_YESCRYPT || algorithm->type == ALGO_YESCRYPT_MULTI) {
+    // By the way, if you change the intensity between now and opencl_scanhash()
+    // calculating the global thread count, God help you.
+    if (algorithm->type == ALGO_QUARK) {
+      clState->GlobalThreadCount = CalcGlobalThreads(clState->compute_shaders, clState->wsize, &cgpu->intensity, &cgpu->xintensity, &cgpu->rawintensity, &cgpu->algorithm);
+      for (int i = 0; i < 6; ++i) {
+        clState->BranchBuffer[i] = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, sizeof(cl_uint) * (clState->GlobalThreadCount + 2), NULL, &status);
+        if (status != CL_SUCCESS && !clState->BranchBuffer[i]) {
+          applog(LOG_ERR, "Error %d while creating BranchBuffer %d.", status, i);
+          return NULL;
+        }
+      }
+    }
+    else if (algorithm->type == ALGO_YESCRYPT || algorithm->type == ALGO_YESCRYPT_MULTI) {
       // need additionnal buffers
       clState->buffer1 = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, buf1size, NULL, &status);
       if (status != CL_SUCCESS && !clState->buffer1) {

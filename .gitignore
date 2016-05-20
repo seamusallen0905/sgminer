@@ -8,6 +8,7 @@ minerd.exe
 
 autom4te.cache
 .deps
+m4
 
 Makefile
 Makefile.in

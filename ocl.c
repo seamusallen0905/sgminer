@@ -877,6 +877,13 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *alg
         }
       }
     }
+    else if (algorithm->type == ALGO_QUBIT) {
+      clState->MidstateBuf = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, sizeof(cl_uint8) * 5, NULL, &status);
+      if (status != CL_SUCCESS && !clState->MidstateBuf) {
+        applog(LOG_ERR, "Error %d: clCreateBuffer (Midstate)", status);
+        return NULL;
+      }
+    }
     else if (algorithm->type == ALGO_YESCRYPT || algorithm->type == ALGO_YESCRYPT_MULTI) {
       // need additionnal buffers
       clState->buffer1 = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, buf1size, NULL, &status);

@@ -40,6 +40,7 @@
 #include "algorithm/blake256.h"
 #include "algorithm/blakecoin.h"
 #include "algorithm/decred.h"
+#include "sph/miniluffa.h"
 
 #include "compat.h"
 
@@ -1109,6 +1110,77 @@ static cl_int queue_quarkcoin_kernel(struct __clState *clState, struct _dev_blk_
   return status;
 }
 
+static void qubit_calc_midstate(void *output, const void *input)
+{
+  int i;
+  uint32_t V00 = 0x6d251e69U, V01 = 0x44b051e0U, V02 = 0x4eaa6fb4U, V03 = 0xdbf78465U, V04 = 0x6e292011U, V05 = 0x90152df4U, V06 = 0xee058139U, V07 = 0xdef610bbU;
+  uint32_t V10 = 0xc3b44b95U, V11 = 0xd9d2f256U, V12 = 0x70eee9a0U, V13 = 0xde099fa3U, V14 = 0x5d9b0557U, V15 = 0x8fc944b3U, V16 = 0xcf1ccf0eU, V17 = 0x746cd581U;
+  uint32_t V20 = 0xf7efc89dU, V21 = 0x5dba5781U, V22 = 0x04016ce5U, V23 = 0xad659c05U, V24 = 0x0306194fU, V25 = 0x666d1836U, V26 = 0x24aa230aU, V27 = 0x8b264ae7U;
+  uint32_t V30 = 0x858075d5U, V31 = 0x36d79cceU, V32 = 0xe571f7d7U, V33 = 0x204b1f67U, V34 = 0x35870c6aU, V35 = 0x57e9e923U, V36 = 0x14bcb808U, V37 = 0x7cde72ceU;
+  uint32_t V40 = 0x6c68e9beU, V41 = 0x5ec41e22U, V42 = 0xc825b7c7U, V43 = 0xaffb4363U, V44 = 0xf5df3999U, V45 = 0x0fc688f1U, V46 = 0xb07224ccU, V47 = 0x03e86ceaU;
+
+  uint32_t M0, M1, M2, M3, M4, M5, M6, M7;
+
+  // Dun care about other compilers, so using the builtin
+  M0 = __builtin_bswap32(((uint32_t *)input)[0]);
+  M1 = __builtin_bswap32(((uint32_t *)input)[1]);
+  M2 = __builtin_bswap32(((uint32_t *)input)[2]);
+  M3 = __builtin_bswap32(((uint32_t *)input)[3]);
+  M4 = __builtin_bswap32(((uint32_t *)input)[4]);
+  M5 = __builtin_bswap32(((uint32_t *)input)[5]);
+  M6 = __builtin_bswap32(((uint32_t *)input)[6]);
+  M7 = __builtin_bswap32(((uint32_t *)input)[7]);
+
+  MI5;
+  P5;
+
+  M0 = __builtin_bswap32(((uint32_t *)input)[8]);
+  M1 = __builtin_bswap32(((uint32_t *)input)[9]);
+  M2 = __builtin_bswap32(((uint32_t *)input)[10]);
+  M3 = __builtin_bswap32(((uint32_t *)input)[11]);
+  M4 = __builtin_bswap32(((uint32_t *)input)[12]);
+  M5 = __builtin_bswap32(((uint32_t *)input)[13]);
+  M6 = __builtin_bswap32(((uint32_t *)input)[14]);
+  M7 = __builtin_bswap32(((uint32_t *)input)[15]);
+
+  MI5;
+  P5;
+
+  WRITE_STATE5(output);
+}
+
+static cl_int queue_qubitcoin_kernel(struct __clState *clState, struct _dev_blk_ctx *blk, __maybe_unused cl_uint threads)
+{
+  cl_kernel *kernel = &clState->kernel;
+  unsigned int num = 0;
+  cl_ulong le_target;
+  cl_int status = 0;
+
+  le_target = *(cl_ulong *)(blk->work->device_target + 24);
+  flip80(clState->cldata, blk->work->data);
+
+  uint32_t midstate[40];
+
+  qubit_calc_midstate((void *)midstate, (void *)clState->cldata);
+
+  status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL, NULL);
+  status |= clEnqueueWriteBuffer(clState->commandQueue, clState->MidstateBuf, true, 0, sizeof(cl_uint8) * 5, midstate, 0, NULL, NULL);
+
+  CL_SET_ARG(clState->CLbuffer0);
+  CL_SET_ARG(clState->MidstateBuf);
+  CL_SET_ARG(clState->padbuffer8);
+  kernel = clState->extra_kernels;
+  CL_SET_ARG_0(clState->padbuffer8);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
+  num = 0;
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(clState->outputBuffer);
+  CL_SET_ARG(le_target);
+
+  return status;
+}
+
 static algorithm_settings_t algos[] = {
   // kernels starting from this will have difficulty calculated by using litecoin algorithm
 #define A_SCRYPT(a) \
@@ -1154,7 +1226,7 @@ static algorithm_settings_t algos[] = {
 
   // kernels starting from this will have difficulty calculated by using quarkcoin algorithm
   { "quarkcoin", ALGO_QUARK, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 11, 8 * 16 * 4194304, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, quarkcoin_regenhash, NULL, NULL, queue_quarkcoin_kernel, gen_hash, append_x11_compiler_options },
-  { "qubitcoin", ALGO_QUBIT, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, qubitcoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
+  { "qubitcoin", ALGO_QUBIT, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 4, 8 * 16 * 4194304, 0, qubitcoin_regenhash, NULL, NULL, queue_qubitcoin_kernel, gen_hash, append_x11_compiler_options },
   { "animecoin", ALGO_ANIME, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, animecoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
   { "sifcoin", ALGO_SIF, "", 256, 256, 256, 0, 0, 0xFF, 0xFFFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, sifcoin_regenhash, NULL, NULL, queue_sph_kernel, gen_hash, append_x11_compiler_options },
 

@@ -880,48 +880,49 @@ static cl_int queue_lyra2rev2_kernel(struct __clState *clState, struct _dev_blk_
   unsigned int num;
   cl_int status = 0;
   cl_ulong le_target;
+  uint32_t buf[11];
 
-  //  le_target = *(cl_uint *)(blk->work->device_target + 28);
   le_target = *(cl_ulong *)(blk->work->device_target + 24);
-  flip80(clState->cldata, blk->work->data);
-  status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL, NULL);
 
   // blake - search
   kernel = &clState->kernel;
   num = 0;
-  //  CL_SET_ARG(clState->CLbuffer0);
-  CL_SET_ARG(clState->buffer1);
-  CL_SET_ARG(blk->work->blk.ctx_a);
-  CL_SET_ARG(blk->work->blk.ctx_b);
-  CL_SET_ARG(blk->work->blk.ctx_c);
-  CL_SET_ARG(blk->work->blk.ctx_d);
-  CL_SET_ARG(blk->work->blk.ctx_e);
-  CL_SET_ARG(blk->work->blk.ctx_f);
-  CL_SET_ARG(blk->work->blk.ctx_g);
-  CL_SET_ARG(blk->work->blk.ctx_h);
-  CL_SET_ARG(blk->work->blk.cty_a);
-  CL_SET_ARG(blk->work->blk.cty_b);
-  CL_SET_ARG(blk->work->blk.cty_c);
+
+  buf[0] = blk->work->blk.ctx_a;
+  buf[1] = blk->work->blk.ctx_b;
+  buf[2] = blk->work->blk.ctx_c;
+  buf[3] = blk->work->blk.ctx_d;
+  buf[4] = blk->work->blk.ctx_e;
+  buf[5] = blk->work->blk.ctx_f;
+  buf[6] = blk->work->blk.ctx_g;
+  buf[7] = blk->work->blk.ctx_h;
+  buf[8] = blk->work->blk.cty_a;
+  buf[9] = blk->work->blk.cty_b;
+  buf[10] = blk->work->blk.cty_c;
+
+  status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 44, buf, 0, NULL, NULL);
+
+  CL_SET_ARG(clState->CLbuffer0);
+  CL_SET_ARG(clState->padbuffer8);
 
   // keccak - search1
   kernel = clState->extra_kernels;
-  CL_SET_ARG_0(clState->buffer1);
+  CL_SET_ARG_0(clState->padbuffer8);
   // cubehash - search2
   num = 0;
-  CL_NEXTKERNEL_SET_ARG_0(clState->buffer1);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
   // lyra - search3
   num = 0;
-  CL_NEXTKERNEL_SET_ARG_N(0, clState->buffer1);
-  CL_SET_ARG_N(1, clState->padbuffer8);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
   // skein -search4
   num = 0;
-  CL_NEXTKERNEL_SET_ARG_0(clState->buffer1);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
   // cubehash - search5
   num = 0;
-  CL_NEXTKERNEL_SET_ARG_0(clState->buffer1);
+  CL_NEXTKERNEL_SET_ARG_0(clState->padbuffer8);
   // bmw - search6
   num = 0;
-  CL_NEXTKERNEL_SET_ARG(clState->buffer1);
+  CL_NEXTKERNEL_SET_ARG(clState->padbuffer8);
   CL_SET_ARG(clState->outputBuffer);
   CL_SET_ARG(le_target);
 
@@ -1258,7 +1259,7 @@ static algorithm_settings_t algos[] = {
   { "fresh", ALGO_FRESH, "", 1, 256, 256, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 4, 4 * 16 * 4194304, 0, fresh_regenhash, NULL, NULL, queue_fresh_kernel, gen_hash, NULL },
 
   { "lyra2re", ALGO_LYRA2RE, "", 1, 128, 128, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 4, 2 * 8 * 4194304, 0, lyra2re_regenhash, blake256_midstate, blake256_prepare_work, queue_lyra2re_kernel, gen_hash, NULL },
-  { "lyra2rev2", ALGO_LYRA2REV2, "", 1, 256, 256, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 6, -1, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, lyra2rev2_regenhash, blake256_midstate, blake256_prepare_work, queue_lyra2rev2_kernel, gen_hash, append_neoscrypt_compiler_options },
+  { "lyra2rev2", ALGO_LYRA2REV2, "", 1, 256, 256, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 6, 2 * 8 * 4194304, 0, lyra2rev2_regenhash, blake256_midstate, blake256_prepare_work, queue_lyra2rev2_kernel, gen_hash, NULL },
 
   // kernels starting from this will have difficulty calculated by using fuguecoin algorithm
 #define A_FUGUE(a, b, c) \

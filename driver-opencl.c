@@ -1037,28 +1037,9 @@ static void set_threads_hashes(unsigned int vectors, unsigned int compute_shader
   unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *xintensity,
   __maybe_unused int *rawintensity, algorithm_t *algorithm)
 {
-  unsigned int threads = 0;
-  while (threads < minthreads) {
+  unsigned int threads;
 
-    if (*rawintensity > 0) {
-      threads = *rawintensity;
-    }
-    else if (*xintensity > 0) {
-      threads = compute_shaders * ((algorithm->xintensity_shift) ? (1 << (algorithm->xintensity_shift + *xintensity)) : *xintensity);
-    }
-    else {
-      threads = 1 << (algorithm->intensity_shift + *intensity);
-    }
-
-    if (threads < minthreads) {
-      if (likely(*intensity < MAX_INTENSITY)) {
-        (*intensity)++;
-      }
-      else {
-        threads = minthreads;
-      }
-    }
-  }
+  threads = calc_global_threads(compute_shaders, minthreads, intensity, xintensity, rawintensity, algorithm);
 
   *globalThreads = threads;
   *hashes = threads * vectors;

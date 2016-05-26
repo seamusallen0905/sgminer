@@ -29,5 +29,6 @@ typedef struct __clState {
 
 extern int clDevicesNum(void);
 extern _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *algorithm);
+extern unsigned int calc_global_threads(unsigned int compute_shaders, unsigned int minthreads, int *intensity, int *xintensity, int *rawintensity, algorithm_t *algorithm);
 
 #endif /* OCL_H */

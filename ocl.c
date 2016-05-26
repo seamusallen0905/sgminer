@@ -180,17 +180,16 @@ static cl_int create_opencl_command_queue(cl_command_queue *command_queue, cl_co
   return status;
 }
 
-// Copied from set_threads_hashes() in driver-opencl.c
-static size_t CalcGlobalThreads(unsigned int compute_shaders, unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *xintensity, __maybe_unused int *rawintensity, algorithm_t *algorithm)
+unsigned int calc_global_threads(unsigned int compute_shaders, unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *xintensity, __maybe_unused int *rawintensity, algorithm_t *algorithm)
 {
-  size_t threads = 0;
+  unsigned int threads = 0;
   while (threads < minthreads) {
 
     if (*rawintensity > 0) {
       threads = *rawintensity;
     }
     else if (*xintensity > 0) {
-      threads = compute_shaders * ((algorithm->xintensity_shift)?(1 << (algorithm->xintensity_shift + *xintensity)):*xintensity);
+      threads = compute_shaders * ((algorithm->xintensity_shift) ? (1 << (algorithm->xintensity_shift + *xintensity)) : *xintensity);
     }
     else {
       threads = 1 << (algorithm->intensity_shift + *intensity);
@@ -206,7 +205,7 @@ static size_t CalcGlobalThreads(unsigned int compute_shaders, unsigned int minth
     }
   }
 
-  return(threads);
+  return threads;
 }
 
 _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *algorithm)
@@ -869,7 +868,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize, algorithm_t *alg
     // By the way, if you change the intensity between now and opencl_scanhash()
     // calculating the global thread count, God help you.
     if (algorithm->type == ALGO_QUARK) {
-      clState->GlobalThreadCount = CalcGlobalThreads(clState->compute_shaders, clState->wsize, &cgpu->intensity, &cgpu->xintensity, &cgpu->rawintensity, &cgpu->algorithm);
+      clState->GlobalThreadCount = calc_global_threads(clState->compute_shaders, clState->wsize, &cgpu->intensity, &cgpu->xintensity, &cgpu->rawintensity, &cgpu->algorithm);
       for (int i = 0; i < 6; ++i) {
         clState->BranchBuffer[i] = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, sizeof(cl_uint) * (clState->GlobalThreadCount + 2), NULL, &status);
         if (status != CL_SUCCESS && !clState->BranchBuffer[i]) {

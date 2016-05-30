@@ -112,10 +112,12 @@ void sha256d_midstate(struct work *work)
 
 #define CL_SET_BLKARG(blkvar) status |= clSetKernelArg(*kernel, num++, sizeof(uint), (void *)&blk->blkvar)
 #define CL_SET_VARG(args, var) status |= clSetKernelArg(*kernel, num++, args * sizeof(uint), (void *)var)
-#define CL_SET_ARG_N(n, var) do { status |= clSetKernelArg(*kernel, n, sizeof(var), (void *)&var); } while (0)
+#define CL_SET_ARG_N(n, var) do { status |= clSetKernelArg(*kernel, n, sizeof(var), (void *)&var); \
+        if (unlikely(status != CL_SUCCESS)) { applog(LOG_ERR, "Error: clSetKernelArg: %d %s", n, #var); } \
+    } while (0)
 #define CL_SET_ARG_0(var) CL_SET_ARG_N(0, var)
 #define CL_SET_ARG(var) CL_SET_ARG_N(num++, var)
-#define CL_NEXTKERNEL_SET_ARG_N(n, var) do { kernel++; CL_SET_ARG_N(n, var); } while (0)
+#define CL_NEXTKERNEL_SET_ARG_N(n, var) do { kernel++; applog(LOG_DEBUG, "Debug: nextkernel: %d %s", n, #var); CL_SET_ARG_N(n, var); } while (0)
 #define CL_NEXTKERNEL_SET_ARG_0(var) CL_NEXTKERNEL_SET_ARG_N(0, var)
 #define CL_NEXTKERNEL_SET_ARG(var) CL_NEXTKERNEL_SET_ARG_N(num++, var)
 

@@ -6182,11 +6182,14 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
     memcpy(work->data + 144 + nonce2_offset, &nonce2le, pool->n2size);
   }
   else if (pool->algorithm.type == ALGO_SIA) {
+    size_t nonce2_offset = MIN(pool->n1_len, 4);
     flip32(work->data, pool->header_bin + 4); // prevhash
     memcpy(work->data + 32, pool->nonce1bin, nonce2_offset);
     memcpy(work->data + 32 + nonce2_offset, &nonce2le, pool->n2size);
-    memcpy(work->data + 32 + 8, pool->header_bin, 8); // timestamp
+    memcpy(work->data + 32 + 8 + 4, pool->header_bin + 68, 4); // timestamp
+    // TODO: merkel swap?
     memcpy(work->data + 32 + 8 + 8, pool->coinbase, 32); // merkleroot
+  }
   else {
     data32 = (uint32_t *)merkle_sha;
     swap32 = (uint32_t *)merkle_root;

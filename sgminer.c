@@ -6116,7 +6116,7 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
   cg_wlock(&pool->data_lock);
 
   nonce2le = htole64(pool->nonce2);
-  if (pool->algorithm.type != ALGO_DECRED) {
+  if (pool->algorithm.type != ALGO_DECRED && pool->algorithm.type != ALGO_SIA) {
     /* Update coinbase. Always use an LE encoded nonce2 to fill in values
     * from left to right and prevent overflow errors with small n2sizes */
     memcpy(pool->coinbase + pool->nonce2_offset, &nonce2le, pool->n2size);
@@ -6127,7 +6127,7 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
   /* Downgrade to a read lock to read off the pool variables */
   cg_dwlock(&pool->data_lock);
 
-  if (pool->algorithm.type != ALGO_DECRED) {
+  if (pool->algorithm.type != ALGO_DECRED && pool->algorithm.type != ALGO_SIA) {
     /* Generate merkle root */
     pool->algorithm.gen_hash(pool->coinbase, pool->swork.cb_len, merkle_root);
     memcpy(merkle_sha, merkle_root, 32);
@@ -6181,6 +6181,12 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
     memcpy(work->data + 144, pool->nonce1bin, nonce2_offset);
     memcpy(work->data + 144 + nonce2_offset, &nonce2le, pool->n2size);
   }
+  else if (pool->algorithm.type == ALGO_SIA) {
+    flip32(work->data, pool->header_bin + 4); // prevhash
+    memcpy(work->data + 32, pool->nonce1bin, nonce2_offset);
+    memcpy(work->data + 32 + nonce2_offset, &nonce2le, pool->n2size);
+    memcpy(work->data + 32 + 8, pool->header_bin, 8); // timestamp
+    memcpy(work->data + 32 + 8 + 8, pool->coinbase, 32); // merkleroot
   else {
     data32 = (uint32_t *)merkle_sha;
     swap32 = (uint32_t *)merkle_root;

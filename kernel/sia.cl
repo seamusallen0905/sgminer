@@ -19,18 +19,30 @@ __constant static const uchar blake2b_sigma[12][16] = {
 	{ 10, 2,  8,  4,  7,  6,  1,  5,  15, 11, 9,  14, 3,  12, 13, 0  } ,
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15 } ,
 	{ 14, 10, 4,  8,  9,  15, 13, 6,  1,  12, 0,  2,  11, 7,  5,  3  } };
-// Target is passed in via headerIn[32 - 29]
-__kernel void nonceGrind(__global ulong *headerIn, __global ulong *nonceOut) {
-	ulong target = headerIn[4];
-	ulong m[16] = {	headerIn[0], headerIn[1],
-	                headerIn[2], headerIn[3],
-	                (ulong)get_global_id(0), headerIn[5],
-	                headerIn[6], headerIn[7],
-	                headerIn[8], headerIn[9], 0, 0, 0, 0, 0, 0 };
+
+__kernel void search(__global unsigned char* block, volatile __global uint* output, const ulong target) {
+	sph_u32 gid = get_global_id(0);
+
+	ulong m[16];
+	m[0] = DEC64BE(block + 0);
+	m[1] = DEC64BE(block + 8);
+	m[2] = DEC64BE(block + 16);
+	m[3] = DEC64BE(block + 24);
+	m[4] = DEC64BE(block + 32);
+	m[4] &= 0xFFFFFFFF00000000;
+	m[4] ^= SWAP4(gid);
+	m[5] = DEC64BE(block + 40);
+	m[6] = DEC64BE(block + 48);
+	m[7] = DEC64BE(block + 56);
+	m[8] = DEC64BE(block + 64);
+	m[9] = DEC64BE(block + 72);
+	m[10] = m[11] = m[12] = m[13] = m[14] = m[15] = 0;
+
 	ulong v[16] = { 0x6a09e667f2bdc928, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
 	                0x510e527fade682d1, 0x9b05688c2b3e6c1f, 0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
 	                0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
 	                0x510e527fade68281, 0x9b05688c2b3e6c1f, 0xe07c265404be4294, 0x5be0cd19137e2179 };
+
 #define G(r,i,a,b,c,d) \
 	a = a + b + m[ blake2b_sigma[r][2*i] ]; \
 	((uint2*)&d)[0] = ((uint2*)&d)[0].yx ^ ((uint2*)&a)[0].yx; \
@@ -40,6 +52,7 @@ __kernel void nonceGrind(__global ulong *headerIn, __global ulong *nonceOut) {
 	((uint2*)&d)[0] = ror64( ((uint2*)&d)[0] ^ ((uint2*)&a)[0], 16U); \
 	c = c + d; \
     ((uint2*)&b)[0] = ror64_2( ((uint2*)&b)[0] ^ ((uint2*)&c)[0], 63U);
+
 #define ROUND(r)                    \
 	G(r,0,v[ 0],v[ 4],v[ 8],v[12]); \
 	G(r,1,v[ 1],v[ 5],v[ 9],v[13]); \
@@ -61,10 +74,12 @@ __kernel void nonceGrind(__global ulong *headerIn, __global ulong *nonceOut) {
 	ROUND( 9 );
 	ROUND( 10 );
 	ROUND( 11 );
+
 #undef G
 #undef ROUND
-	if (as_ulong(as_uchar8(0x6a09e667f2bdc928 ^ v[0] ^ v[8]).s76543210) < target) {
-		*nonceOut = m[4];
-		return;
-	}
+
+	// TODO: bool result = (SWAP8(v[8]) <= target);
+	bool result = (SWAP8(0x6a09e667f2bdc928 ^ v[0] ^ v[8]) <= target);
+	if (result)
+		output[output[0xFF]++] = SWAP4(gid);
 }

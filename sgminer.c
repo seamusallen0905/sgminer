@@ -5630,6 +5630,9 @@ static void *stratum_sthread(void *userdata)
     else if (pool->algorithm.type == ALGO_LBRY) {
       nonce = *((uint32_t *)(work->data + 108));
     }
+    else if (pool->algorithm.type == ALGO_SIA) {
+      nonce = *((uint32_t *)(work->data + 32));
+    }
     else {
       nonce = *((uint32_t *)(work->data + 76));
     }
@@ -6183,12 +6186,11 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
   }
   else if (pool->algorithm.type == ALGO_SIA) {
     size_t nonce2_offset = MIN(pool->n1_len, 4);
-    flip32(work->data, pool->header_bin + 4); // prevhash
-    memcpy(work->data + 32, pool->nonce1bin, nonce2_offset);
-    memcpy(work->data + 32 + nonce2_offset, &nonce2le, pool->n2size);
-    memcpy(work->data + 32 + 8 + 4, pool->header_bin + 68, 4); // timestamp
-    // TODO: merkel swap?
-    memcpy(work->data + 32 + 8 + 8, pool->coinbase, 32); // merkleroot
+    swab256(work->data, pool->header_bin + 4); // prevhash
+    memcpy(work->data + 32 + 4, pool->nonce1bin, nonce2_offset);
+    memcpy(work->data + 32 + 4 + nonce2_offset, &nonce2le, pool->n2size);
+    memcpy(work->data + 32 + 8, pool->header_bin + 68, 4); // timestamp
+    flip32(work->data + 32 + 8 + 8, pool->coinbase); // merkleroot
   }
   else {
     data32 = (uint32_t *)merkle_sha;
@@ -7162,6 +7164,7 @@ static void rebuild_nonce(struct work *work, uint32_t nonce)
   if (work->pool->algorithm.type == ALGO_CRE) nonce_pos = 140;
   else if (work->pool->algorithm.type == ALGO_DECRED) nonce_pos = 140;
   else if (work->pool->algorithm.type == ALGO_LBRY) nonce_pos = 108;
+  else if (work->pool->algorithm.type == ALGO_SIA) nonce_pos = 32;
 
   uint32_t *work_nonce = (uint32_t *)(work->data + nonce_pos);
 

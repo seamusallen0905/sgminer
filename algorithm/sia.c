@@ -220,11 +220,13 @@ void siaHash(void *state, const void *input)
 void sia_regenhash(struct work *work)
 {
   uint32_t data[20];
+  uint32_t hash[16];
   char *scratchbuf;
-  uint32_t *nonce = (uint32_t *)(work->data + 36);
+  uint32_t *nonce = (uint32_t *)(work->data + 32);
   uint32_t *ohash = (uint32_t *)(work->hash);
 
   be32enc_vect(data, (const uint32_t *)work->data, 20);
-  data[9] = htobe32(*nonce);
-  siaHash(ohash, data);
+  data[8] = htobe32(*nonce);
+  siaHash(hash, data);
+  swab256(ohash, hash);
 }

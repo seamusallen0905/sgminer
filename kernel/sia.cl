@@ -1,3 +1,39 @@
+
+#if __ENDIAN_LITTLE__
+  #define SPH_LITTLE_ENDIAN 1
+#else
+  #define SPH_BIG_ENDIAN 1
+#endif
+
+#define SPH_UPTR sph_u64
+
+typedef unsigned int sph_u32;
+typedef int sph_s32;
+#ifndef __OPENCL_VERSION__
+  typedef unsigned long long sph_u64;
+  typedef long long sph_s64;
+#else
+  typedef unsigned long sph_u64;
+  typedef long sph_s64;
+#endif
+
+#define SPH_64 1
+#define SPH_64_TRUE 1
+
+#define SWAP4(x) as_uint(as_uchar4(x).wzyx)
+#define SWAP8(x) as_ulong(as_uchar8(x).s76543210)
+
+#if SPH_BIG_ENDIAN
+  #define DEC64E(x) (x)
+  #define DEC64BE(x) (*(const __global sph_u64 *) (x));
+  #define DEC32LE(x) SWAP4(*(const __global sph_u32 *) (x));
+#else
+  #define DEC64E(x) SWAP8(x)
+  #define DEC64BE(x) SWAP8(*(const __global sph_u64 *) (x));
+  #define DEC64LE(x) (*(const __global sph_u64 *) (x));
+  #define DEC32LE(x) (*(const __global sph_u32 *) (x));
+#endif
+
 inline static uint2 ror64(const uint2 x, const uint y)
 {
     return (uint2)(((x).x>>y)^((x).y<<(32-y)),((x).y>>y)^((x).x<<(32-y)));
@@ -24,18 +60,18 @@ __kernel void search(__global unsigned char* block, volatile __global uint* outp
 	sph_u32 gid = get_global_id(0);
 
 	ulong m[16];
-	m[0] = DEC64BE(block + 0);
-	m[1] = DEC64BE(block + 8);
-	m[2] = DEC64BE(block + 16);
-	m[3] = DEC64BE(block + 24);
-	m[4] = DEC64BE(block + 32);
+	m[0] = DEC64LE(block + 0);
+	m[1] = DEC64LE(block + 8);
+	m[2] = DEC64LE(block + 16);
+	m[3] = DEC64LE(block + 24);
+	m[4] = DEC64LE(block + 32);
 	m[4] &= 0xFFFFFFFF00000000;
-	m[4] ^= SWAP4(gid);
-	m[5] = DEC64BE(block + 40);
-	m[6] = DEC64BE(block + 48);
-	m[7] = DEC64BE(block + 56);
-	m[8] = DEC64BE(block + 64);
-	m[9] = DEC64BE(block + 72);
+	m[4] ^= (gid);
+	m[5] = DEC64LE(block + 40);
+	m[6] = DEC64LE(block + 48);
+	m[7] = DEC64LE(block + 56);
+	m[8] = DEC64LE(block + 64);
+	m[9] = DEC64LE(block + 72);
 	m[10] = m[11] = m[12] = m[13] = m[14] = m[15] = 0;
 
 	ulong v[16] = { 0x6a09e667f2bdc928, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
@@ -78,7 +114,6 @@ __kernel void search(__global unsigned char* block, volatile __global uint* outp
 #undef G
 #undef ROUND
 
-	// TODO: bool result = (SWAP8(v[8]) <= target);
 	bool result = (SWAP8(0x6a09e667f2bdc928 ^ v[0] ^ v[8]) <= target);
 	if (result)
 		output[output[0xFF]++] = SWAP4(gid);
